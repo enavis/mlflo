@@ -1,0 +1,15 @@
+artifact_uri: mlruns/0/e14e31c91e9747df8b49e4be5a18dfad/artifacts
+end_time: 1658342230341
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+name: ''
+run_id: e14e31c91e9747df8b49e4be5a18dfad
+run_uuid: e14e31c91e9747df8b49e4be5a18dfad
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1658342227901
+status: 4
+tags: []
+user_id: enavis
