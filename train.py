@@ -1,15 +1,14 @@
-import os
-import warnings
 import sys
-
-import pandas as pd
-import numpy as np
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import ElasticNet
+import warnings
 
 import mlflow
 import mlflow.sklearn
+import numpy as np
+import pandas as pd
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import ElasticNet
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
 
 
 def eval_metrics(actual, pred):
@@ -22,14 +21,52 @@ def eval_metrics(actual, pred):
 def load_data(data_path):
     data = pd.read_csv(data_path)
 
-    # Split the data into training and test sets. (0.75, 0.25) split.
-    train, test = train_test_split(data)
+    data["income_cat"] = pd.cut(
+        data["median_income"],
+        bins=[0.0, 1.5, 3.0, 4.5, 6.0, np.inf],
+        labels=[1, 2, 3, 4, 5],
+    )
 
-    # The predicted column is "quality" which is a scalar from [3, 9]
-    train_x = train.drop(["quality"], axis=1)
-    test_x = test.drop(["quality"], axis=1)
-    train_y = train[["quality"]]
-    test_y = test[["quality"]]
+    data["rooms_per_household"] = data["total_rooms"] / data["households"]
+    data["bedrooms_per_room"] = data["total_bedrooms"] / data["total_rooms"]
+    data["population_per_household"] = data["population"] / data["households"]
+
+    imputer = SimpleImputer(strategy="median")
+
+    housing_num = data.drop("ocean_proximity", axis=1)
+
+    imputer.fit(housing_num)
+    X = imputer.transform(housing_num)
+
+    housing_tr = pd.DataFrame(X, columns=housing_num.columns, index=housing.index)
+    housing_tr["rooms_per_household"] = (
+        housing_tr["total_rooms"] / housing_tr["households"]
+    )
+    housing_tr["bedrooms_per_room"] = (
+        housing_tr["total_bedrooms"] / housing_tr["total_rooms"]
+    )
+    housing_tr["population_per_household"] = (
+        housing_tr["population"] / housing_tr["households"]
+    )
+
+    housing_cat = data[["ocean_proximity"]]
+    data = housing_tr.join(pd.get_dummies(housing_cat, drop_first=True))
+
+    # Split the data into training and test sets. (0.75, 0.25) split
+    split = StratifiedShuffleSplit(n_splits=1, test_size=0.25, random_state=42)
+
+    for train_index, test_index in split.split(data, data["income_cat"]):
+        strat_train_set = data.loc[train_index]
+        strat_test_set = data.loc[test_index]
+
+    for set_ in (strat_train_set, strat_test_set):
+        set_.drop("income_cat", axis=1, inplace=True)
+
+    train_x = strat_train_set.drop("median_house_value", axis=1)
+    test_x = strat_test_set.drop("median_house_value", axis=1)
+    train_y = strat_train_set["median_house_value"]
+    test_y = strat_test_set["median_house_value"]
+
     return train_x, train_y, test_x, test_y
 
 
@@ -38,7 +75,7 @@ if __name__ == "__main__":
     np.random.seed(40)
 
     # Read the wine-quality csv file (make sure you're running this from the root of MLflow!)
-    data_path = "data/wine-quality.csv"
+    data_path = "data/housing.csv"
     train_x, train_y, test_x, test_y = load_data(data_path)
 
     alpha = float(sys.argv[1]) if len(sys.argv) > 1 else 0.5
