@@ -1,4 +1,4 @@
-name: conda_tutorial
+name: Emmanuel_conda_tutorial
 
 conda_env:
    conda.yaml
